@@ -8,7 +8,7 @@ import torch.nn as nn
 
 
 #%%
-class selfAttentopnV1(nn.Module):
+class SelfAttentopnV1(nn.Module):
     def __init__(self, hidden_dim: int = 720) -> None:
         super().__init__() # initialize nn.module
         self.hidden_dim = hidden_dim
@@ -39,7 +39,7 @@ class selfAttentopnV1(nn.Module):
         return output
 
 X = torch.rand(3,2,4)
-self_att_net = selfAttentopnV1(4)     
+self_att_net = SelfAttentopnV1(4)     
 output = self_att_net(X)
 print(output)
 
@@ -79,7 +79,7 @@ print(output)
 # 2. attention mask
 # 3. output matrix projection
 
-class selfAttentionV3(nn.Module):
+class SelfAttentionV3(nn.Module):
     def __init__(self, dim, dropout_rate=0.1) -> None:
         super().__init__()
         self.dim = dim
@@ -111,7 +111,7 @@ class selfAttentionV3(nn.Module):
         attention_weight = self.attention_dropout(attention_weight) # prevent overfitting
         attention_result = attention_weight @ V
 
-        output = self.output_proj(attention_result)
+        output = self.output_proj(attention_result) # for multihead attention, project output back to proper dimension after concatenation
         return output 
     
 X = torch.rand(3,4,2)
@@ -124,11 +124,11 @@ mask = torch.tensor(
     ]
 )
 mask = mask.unsqueeze(dim = 1).repeat(1, 4, 1)
-self_att_net3 = selfAttentionV3(2)
+self_att_net3 = SelfAttentionV3(2)
 output = self_att_net3.forward(X,mask)
 print(output)
 #%% self-attention interview
-class selfAttentionInterview(nn.Module):
+class SelfAttentionInterview(nn.Module):
     def __init__(self, dim : int, dropout_rate:float = 0.1, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.dim = dim 
@@ -179,7 +179,7 @@ mask = torch.tensor(
 # mask should be (batch, seq, seq)
 mask = mask.unsqueeze(dim = 1).repeat(1,4,1)
 
-self_att_net_interview = selfAttentionInterview(2)
+self_att_net_interview = SelfAttentionInterview(2)
 
 output = self_att_net_interview.forward(X,mask)
 print(output)
