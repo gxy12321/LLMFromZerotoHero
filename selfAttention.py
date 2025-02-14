@@ -29,6 +29,7 @@ class SelfAttentopnV1(nn.Module):
         )
         
         # (batch_size, seq, seq)
+        # Each elememnt of attention weight tells you how much a token is relavent to the current token's representation
         attention_weight = torch.softmax(
             attention_value/math.sqrt(self.hidden_dim), # divding the attention value by sqrt(hidden_dim) to prevent gradient vanishing
             dim = -1

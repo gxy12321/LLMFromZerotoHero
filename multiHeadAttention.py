@@ -1,3 +1,4 @@
+#%%
 import math
 import torch
 import torch.nn as nn
@@ -49,13 +50,28 @@ class MultiHeadSelfAttentionFormal(nn.Module):
             attention_weight, v_state
         ) # (b, head_num, s, head_dim) => (b, s, h)
 
-        output_mid = output_mid.transpose(1,2).contiguous()
-        output_mid = output_mid.view(batch_size, seq_len, self.hidden_dim)
+        output_mid = output_mid.transpose(1,2).contiguous() # contiguous() is necessary since transpose() only change the order elements should be accessed but does not rearrange them physically
+        output_mid = output_mid.view(batch_size, seq_len, self.hidden_dim) # raise error without contiguous()
 
-        output = self.out_proj(output)
+        output = self.out_proj(output_mid)
         return output
-    
+
+attention_mask = (
+    torch.tensor(
+        [
+            [0,1],
+            [0,0],
+            [1,0],
+        ]
+    )
+    .unsqueeze(1)
+    .unsqueeze(2)
+    .expand(3,8,2,2)
+) 
+x = torch.rand(3,2,128)
+net = MultiHeadSelfAttentionFormal(128,8)
+net(x, attention_mask)
 
 
 
-
+# %%
