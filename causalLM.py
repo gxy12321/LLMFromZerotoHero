@@ -86,7 +86,7 @@ class Decoder(nn.Module):
             [
                 SimpleDecoderLayer(64, 8) for i in range(5)
             ]
-        )
+        ) 
         self.emb = nn.Embedding(12, 64)
         self.out = nn.Linear(64, 12)
     def forward(self, X, mask = None):
