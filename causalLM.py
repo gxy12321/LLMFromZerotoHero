@@ -54,6 +54,7 @@ class SimpleDecoderLayer(nn.Module):
         batch, seq, _, _ = mid_out.size()
         mid_out = mid_out.view(batch, seq, self.hidden_dim)
         output = self.o_proj(mid_out)
+        output = self.att_ln(output + self.drop_att)
         # (b, s, h)
         return output
 
@@ -115,6 +116,5 @@ mask = (
     .repeat(1, 8, 4, 1)
 )
 net(X, mask)
-# %%
-X
+
 # %%

@@ -47,7 +47,7 @@ print(output)
 
 #%%
 # Efficiency optimization
-# When Q, K, V is small, 
+# When Q, K, V is small, we can combine them into a large matrix
 class SelfAttentionV2(nn.Module):
     def __init__(self, dim, *args, **kwargs) -> None:
         super().__init__() # initialize nn.Module
@@ -101,7 +101,7 @@ class SelfAttentionV3(nn.Module):
         if attention_mask is not None: # multiply the masked elememts by a very small value
             attention_weight = attention_weight.masked_fill(
                 attention_mask == 0,
-                float("-1e20")
+                float("-inf")
             )
         attention_weight = torch.softmax(
             attention_weight,
@@ -116,7 +116,7 @@ class SelfAttentionV3(nn.Module):
         return output 
     
 X = torch.rand(3,4,2)
-# (batch, seq, seq)
+# (batch, seq)
 mask = torch.tensor(
     [
         [1, 1, 1, 0],
@@ -124,6 +124,7 @@ mask = torch.tensor(
         [1, 0, 0, 0]
     ]
 )
+# (batch, seq) => (batch, seq, seq) 
 mask = mask.unsqueeze(dim = 1).repeat(1, 4, 1)
 self_att_net3 = SelfAttentionV3(2)
 output = self_att_net3.forward(X,mask)
