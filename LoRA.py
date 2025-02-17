@@ -18,7 +18,6 @@ class LinearLoRALayer(nn.Module):
 
         self.linear = nn.Linear(in_features, out_features)
 
-        # linear: weight is (out_features, in_features)
         # input x shape is (batch, seq_len, in_features)
         # calculation: x @ weight.T
         # so weight shape is (out_features, in_features)
@@ -52,7 +51,7 @@ class LinearLoRALayer(nn.Module):
         if self.rank > 0:
             output_part1 = self.linear(X)
             output_part2 = self.scale * ( X @ (self.lora_a @ self.lora_b).T )
-            output = output_part1 + output_part2 # this is very important. We realize LoRA by Y = X @ W_0^T + X @ (A@B).T instead of Y = X @ (W_0 + A @ B).T. If we merge weights before forwaring, LoRA needs more video memory.
+            output = output_part1 + output_part2 # this is very important. We realize LoRA by Y = X @ W_0^T + X @ (A@B).T instead of Y = X @ (W_0 + A @ B).T. If we merge weights before forwaring, LoRA needs even more video memory than the case without LoRA.
             
         else:
             output = self.linear(X)

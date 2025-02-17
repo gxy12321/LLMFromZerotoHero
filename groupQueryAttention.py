@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 # ignore attention_mask, attention_dropout
 class GroupQueryAttention(nn.Module):
-    def __init__(self, hidden_dim, nums_head,nums_key_value_head, *args, **kwargs) -> None:
+    def __init__(self, hidden_dim, nums_head,nums_key_value_head, dropout_rate=0.1, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         assert hidden_dim % nums_head == 0 
         assert nums_head % nums_key_value_head == 0
@@ -15,6 +15,7 @@ class GroupQueryAttention(nn.Module):
         self.nums_head = nums_head
         self.nums_key_value_head = nums_key_value_head
         self.head_dim = hidden_dim // nums_head
+        self.att_dropout = nn.Dropout(dropout_rate)
 
         self.q_proj = nn.Linear(hidden_dim, self.head_dim * nums_head)
         self.k_proj = nn.Linear(hidden_dim, self.head_dim * nums_key_value_head)
@@ -47,12 +48,21 @@ class GroupQueryAttention(nn.Module):
         v = v.repeat_interleave(self.nums_head // self.nums_key_value_head, dim = 1)
 
         attention_score = (q @ k.transpose(2,3)) / math.sqrt(self.head_dim)
+        if attention_mask is not None:
+            attention_score = attention_score.masked_fill(
+                attention_mask == 0,
+                float("-inf")
+            )
 
         attention_weight = torch.softmax(attention_score, dim=-1)
-        # (ignore attention_mask here)
-
+        attention_weight = self.att_dropout(attention_weight) # why is dropout happening after softmax?
+        # softmax converts attention_weights into probabilities
+        # dropout zeros out specific attention weights 
+        # if dropout were applied before softmax, droppint some logits would cause the remaining ones to be amplified during re-normalization.
+        # post-softmax dropout makes the gradient locally depends on dropout but globally if it is pre-softmax
+        # pre-softmax dropout leads to non-zero softmax probabilities at masked positions
+        
         output = attention_weight @ v 
-
         output = self.o_proj(output.view(batch_size, seq, -1))
         return output
 

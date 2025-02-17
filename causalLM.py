@@ -43,8 +43,11 @@ class SimpleDecoderLayer(nn.Module):
                 attention_mask==0,
                 float("-inf")
             )
+        # why if-else:
+        # some seq_len of input is less than block_size, so we need to use both padding mask and attention mask
+
         print(attention_weight)
-        attention_weight = torch.softmax(attention_weight, -1)
+        attention_weight = torch.softmax(attention_weight, dim=-1)
 
         attention_weight = self.drop_att(attention_weight)
 
