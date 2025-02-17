@@ -1,4 +1,4 @@
-# Realization of GPT-2
+# Realization of GPT-2: https://miro.medium.com/v2/resize:fit:1400/1*YZTqlV51QyhX6VL9AV31eQ.png
 import torch.nn as nn
 import math
 import torch
@@ -42,7 +42,7 @@ class SingleHeadAttention(nn.Module):
                 torch.ones(config.block_size,config.block_size)
             )
         ) # <--- Automatically device-aware 
-        # if attention_mask is a nn.parameter, it unnecessarily requires graduents, wasting memory and computation
+        # if attention_mask is a nn.parameter, it unnecessarily requires graduents, wasting memory and computation. But attention mask is a constant matrix, there is no need to calculate its gradient.
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self,x):
@@ -52,7 +52,7 @@ class SingleHeadAttention(nn.Module):
         q = self.query(x)
         v = self.value(x)
 
-        weight = q @ k.transpose(-2,-1) # @ is a simplified version of torch.matmul
+        weight = torch.matmul(q, k.transpose(-2,-1)) # @ is a simplified version of torch.matmul
         weight = weight.masked_fill(
             self.attention_mask[:seq_len, :seq_len] == 0,
             float("-inf")
@@ -95,9 +95,9 @@ class FeedForward(nn.Module):
     def __init__(self, config, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.net = nn.Sequential(
-            nn.Linear(config.hidden_dim, config.hidden_dim * 4),
-            nn.GELU(),
-            nn.Linear(config.hidden_dim * 4, config.hidden_dim ),
+            nn.Linear(config.hidden_dim, config.hidden_dim * 4), # increasing dimension to approximate the infinite basis of smooth projection
+            nn.GELU(), # introduce non-linearity
+            nn.Linear(config.hidden_dim * 4, config.hidden_dim ), # our target is to return a hidden_dim function so we project it back by adding up values of high-dimensional basis functions
             nn.Dropout(config.dropout)
         )
 
@@ -108,7 +108,7 @@ class FeedForward(nn.Module):
 class Block(nn.Module): 
     def __init__(self, config, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.att = MultiHeadAttention(config)
+        self.att = MultiHeadAttention(config) # mha
         self.ffn = FeedForward(config)
         self.ln1 = nn.LayerNorm(config.hidden_dim)
         self.ln2 = nn.LayerNorm(config.hidden_dim)
@@ -136,7 +136,7 @@ class GPT(nn.Module):
         self.ln_final = nn.LayerNorm(config.n_emb)
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias = False)
 
-        # present slm models use tie_weight to reduce the number of parameters
+        # current slm models use tie_weight to reduce the number of parameters
         self.token_embedding_table.weight = self.lm_head.weight # very important # linear (4 -> 8), actual weight shape is 8 * 4
 
     def _init_weight(self, module):
@@ -151,16 +151,15 @@ class GPT(nn.Module):
 
     def forward(self, idx, targets=None):
         # idx: token ids
-        # targets is target token ids
-        # shape should be the same
+        # targets is the target token ids
+        # shape of idx and targets should be the same
         batch, seq_len = idx.size() # (batch, seq_len)
         token_emb = self.token_embedding_table(idx) # (batch, seq_len, n_embd)
-
         pos_emb = self.position_embedding_table(
             torch.arange(seq_len, device = idx.device) # Number 1 ... seq_len words are put into GPU
         ) # make sure they are on the same device
 
-        # Classic interview question: can we add token_emb to pos_emb
+        # Classic interview question: why can we add token_emb to pos_emb
         x = token_emb + pos_emb # shape: (batch, seq_len, n_embd)
         x = self.blocks(x)
         x = self.ln_final(x)
@@ -171,11 +170,58 @@ class GPT(nn.Module):
         else: 
             batch, seq_len, vocab_size = logits.size()
             logits = logits.view(batch * seq_len, vocab_size)
-            targets = targets.view(batch* seq_len)
+            targets = targets.view(batch * seq_len)
             loss = F.cross_entropy(logits, targets)
         return logits, loss
 
-        
+    def generate(self, idx, max_new_tokens):
+        pass # TODO
 
+# Dataset
+# write a dataset, for the preparation of dataloader
+class MyDataset(Dataset):
+    def __init__(self, path, block_size = 512) -> None:
+        import tiktoken
+        self.enc = tiktoken.get_encoding()
+        self.block_size = block_size # max length of pos
+
+        self.encoded_data = []
+        # a special character to sperate text
+        # GPT: <|endoftext|> # [50256]
+        self.eos_token = self.enc.encode(
+            "<|endoftext|>",
+            allowed_special = {"<|endoftext|>"}
+        )[0]
+
+        self.max_lines = 1000
+        import json
+
+        raw_data = [] # pre-process text and save it as .pkl or .npy and directly put it into GPU to increase the training efficiency
+        with path(path, 'r') as f:
+            for i, line in enumerate(f):
+                if i >= self.max_lines:
+                    break
+                else:
+                    try:
+                        text = json.loads(line.strip())["text"]
+                        raw_data.append(text)
+                    except Exception as e:
+                        continue
+
+        full_encoded = []
+        for text in raw_data:
+            encoded_text = self.enc.encode(text) # list
+            full_encoded.extend(encoded_text + [self.eos_token])
+        
+        # block size is 512 (max seq_len)
+        # long text needs to be divided into short text: (512)
+        for i in range(0, len(full_encoded), self.block_size):
+            chunk = full_encoded[i: i+ self.block_size + 1] # 512 # shift 1 position to the right for the target, so actual row length is 513
+            if len(chunk) < self.block_size + 1:
+                chunk += [self.eos_token] * (self.block_size + 1 - len(chunk)) # padding eos_token to fill 512
+            
+            self.encoded_data.append(chunk)
+
+        pass
 
         
