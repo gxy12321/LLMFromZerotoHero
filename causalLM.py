@@ -29,7 +29,7 @@ class SimpleDecoderLayer(nn.Module):
 
     def attention_layer(self, query, key, value, attention_mask = None):
         key = key.transpose(2,3) # (b, head_num, head_dim, seq)
-        attention_weight = torch.matmul(query, key)/math.sqrt(self.head_dim)
+        attention_weight = torch.matmul(query, key)/math.sqrt(self.head_dim) #(b, head_num, seq, seq)
 
         if attention_mask is not None:
             attention_mask = attention_mask.tril()
@@ -51,13 +51,13 @@ class SimpleDecoderLayer(nn.Module):
 
         attention_weight = self.drop_att(attention_weight)
 
-        # (b, head_num, seq, head_dim)=> (b, seq, head_num, head_dim)
-        mid_out = torch.matmul(attention_weight, value)
-        mid_out = mid_out.transpose(1,2).contiguous()
+        mid_out = torch.matmul(attention_weight, value) # (b, head_num, seq, head_dim)
+
+        mid_out = mid_out.transpose(1,2).contiguous()   # (b, head_num, seq, head_dim)=> (b, seq, head_num, head_dim)
         batch, seq, _, _ = mid_out.size()
         mid_out = mid_out.view(batch, seq, self.hidden_dim)
         output = self.o_proj(mid_out)
-        output = self.att_ln(output + self.drop_att)
+        output = self.att_ln(output + self.drop_att) # residual
         # (b, s, h)
         return output
 
